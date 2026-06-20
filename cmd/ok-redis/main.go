@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"io"
 	"log"
 	"net"
+	"strings"
 )
 
 func main() {
@@ -29,4 +32,28 @@ func handleConn(conn net.Conn) {
 	defer conn.Close()
 
 	log.Println("client connected:", conn.RemoteAddr())
+
+	reader := bufio.NewReader(conn)
+
+	for {
+		// first command loop
+		// reads until the client sends a newline
+		// this is not redis protocol yet
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err != io.EOF {
+				log.Println("read:", err)
+			}
+			return
+		}
+
+		command := strings.TrimSpace(line)
+
+		switch strings.ToUpper(command) {
+		case "PING":
+			_, _ = conn.Write([]byte("PONG\r\n"))
+		default:
+			_, _ = conn.Write([]byte("ERR unknown command\r\n"))
+		}
+	}
 }
