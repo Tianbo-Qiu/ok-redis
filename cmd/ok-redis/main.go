@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Tianbo-Qiu/ok-redis/internal/resp"
+	"github.com/Tianbo-Qiu/ok-redis/internal/store"
 )
 
 func main() {
@@ -18,6 +19,8 @@ func main() {
 		log.Fatal(err)
 	}
 	defer ln.Close()
+
+	st := store.New()
 
 	log.Println("ok-redis listening on :6380")
 
@@ -28,11 +31,11 @@ func main() {
 			continue
 		}
 
-		go handleConn(conn)
+		go handleConn(conn, st)
 	}
 }
 
-func handleConn(conn net.Conn) {
+func handleConn(conn net.Conn, st *store.Store) {
 	defer conn.Close()
 
 	log.Println("client connected:", conn.RemoteAddr())
@@ -57,8 +60,40 @@ func handleConn(conn net.Conn) {
 		switch command {
 		case "PING":
 			_, _ = conn.Write([]byte("+PONG\r\n"))
+
+		case "SET":
+			if len(args) != 3 {
+				_, _ = fmt.Fprint(conn, "-ERR wrong number of arguments for 'set' command\r\n")
+				continue
+			}
+			st.Set(args[1], args[2])
+			_, _ = conn.Write([]byte("+OK\r\n"))
+
+		case "GET":
+			if len(args) != 2 {
+				_, _ = fmt.Fprint(conn, "-ERR wrong number of arguments for 'get' command\r\n")
+				continue
+			}
+			value, ok := st.Get(args[1])
+			if !ok {
+				_, _ = conn.Write([]byte("$-1\r\n")) // null bulk string = nil
+				continue
+			}
+			_, _ = fmt.Fprintf(conn, "$%d\r\n%s\r\n", len(value), value)
+
+		case "DEL":
+			if len(args) != 2 {
+				_, _ = fmt.Fprint(conn, "-ERR wrong number of arguments for 'del' command\r\n")
+				continue
+			}
+			deleted := 0
+			if st.Del(args[1]) {
+				deleted = 1
+			}
+			_, _ = fmt.Fprintf(conn, ":%d\r\n", deleted)
+
 		default:
-			_, _ = fmt.Fprintf(conn, "-ERR unknown command '%s'\r\n", args[0])
+			_, _ = fmt.Fprint(conn, "-ERR unknown command\r\n")
 		}
 	}
 }
