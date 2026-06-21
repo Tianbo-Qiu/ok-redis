@@ -1,5 +1,5 @@
 # Binaries
-ok-redis
+/ok-redis
 *.exe
 *.exe~
 *.dll

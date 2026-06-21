@@ -2,10 +2,14 @@ package main
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"strings"
+
+	"github.com/Tianbo-Qiu/ok-redis/internal/resp"
 )
 
 func main() {
@@ -36,24 +40,25 @@ func handleConn(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 
 	for {
-		// first command loop
-		// reads until the client sends a newline
-		// this is not redis protocol yet
-		line, err := reader.ReadString('\n')
+		args, err := resp.ReadCommand(reader)
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				log.Println("read:", err)
 			}
 			return
 		}
 
-		command := strings.TrimSpace(line)
+		if len(args) == 0 {
+			continue
+		}
 
-		switch strings.ToUpper(command) {
+		command := strings.ToUpper(args[0])
+
+		switch command {
 		case "PING":
-			_, _ = conn.Write([]byte("PONG\r\n"))
+			_, _ = conn.Write([]byte("+PONG\r\n"))
 		default:
-			_, _ = conn.Write([]byte("ERR unknown command\r\n"))
+			_, _ = fmt.Fprintf(conn, "-ERR unknown command '%s'\r\n", args[0])
 		}
 	}
 }
