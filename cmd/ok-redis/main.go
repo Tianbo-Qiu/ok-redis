@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/Tianbo-Qiu/ok-redis/internal/resp"
@@ -91,6 +92,75 @@ func handleConn(conn net.Conn, st *store.Store) {
 				deleted = 1
 			}
 			_, _ = fmt.Fprintf(conn, ":%d\r\n", deleted)
+
+		case "INCR":
+			if len(args) != 2 {
+				_, _ = fmt.Fprint(conn, "-ERR wrong number of arguments for 'incr' command\r\n")
+				continue
+			}
+			n, err := st.Incr(args[1], 1)
+			if err != nil {
+				_, _ = fmt.Fprintf(conn, "-ERR %s\r\n", err)
+				continue
+			}
+			_, _ = fmt.Fprintf(conn, ":%d\r\n", n)
+
+		case "DECR":
+			if len(args) != 2 {
+				_, _ = fmt.Fprint(conn, "-ERR wrong number of arguments for 'decr' command\r\n")
+				continue
+			}
+			n, err := st.Incr(args[1], -1)
+			if err != nil {
+				_, _ = fmt.Fprintf(conn, "-ERR %s\r\n", err)
+				continue
+			}
+			_, _ = fmt.Fprintf(conn, ":%d\r\n", n)
+
+		case "EXISTS":
+			if len(args) != 2 {
+				_, _ = fmt.Fprint(conn, "-ERR wrong number of arguments for 'exists' command\r\n")
+				continue
+			}
+			exists := 0
+			if _, ok := st.Get(args[1]); ok {
+				exists = 1
+			}
+			_, _ = fmt.Fprintf(conn, ":%d\r\n", exists)
+
+		case "INCRBY":
+			if len(args) != 3 {
+				_, _ = fmt.Fprint(conn, "-ERR wrong number of arguments for 'incrby' command\r\n")
+				continue
+			}
+			delta, err := strconv.ParseInt(args[2], 10, 64)
+			if err != nil {
+				_, _ = fmt.Fprint(conn, "-ERR value is not an integer or out of range\r\n")
+				continue
+			}
+			n, err := st.Incr(args[1], delta)
+			if err != nil {
+				_, _ = fmt.Fprintf(conn, "-ERR %s\r\n", err)
+				continue
+			}
+			_, _ = fmt.Fprintf(conn, ":%d\r\n", n)
+
+		case "DECRBY":
+			if len(args) != 3 {
+				_, _ = fmt.Fprint(conn, "-ERR wrong number of arguments for 'decrby' command\r\n")
+				continue
+			}
+			delta, err := strconv.ParseInt(args[2], 10, 64)
+			if err != nil {
+				_, _ = fmt.Fprint(conn, "-ERR value is not an integer or out of range\r\n")
+				continue
+			}
+			n, err := st.Incr(args[1], -delta)
+			if err != nil {
+				_, _ = fmt.Fprintf(conn, "-ERR %s\r\n", err)
+				continue
+			}
+			_, _ = fmt.Fprintf(conn, ":%d\r\n", n)
 
 		default:
 			_, _ = fmt.Fprint(conn, "-ERR unknown command\r\n")
