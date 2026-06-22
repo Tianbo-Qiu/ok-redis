@@ -45,3 +45,31 @@ func TestDispatch(t *testing.T) {
 		})
 	}
 }
+
+func TestDispatchExpiry(t *testing.T) {
+	s := store.New()
+	s.Set("k", "v")
+
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"ttl no expiry", []string{"TTL", "k"}, ":-1\r\n"},
+		{"ttl missing key", []string{"TTL", "missing"}, ":-2\r\n"},
+		{"expire missing key", []string{"EXPIRE", "missing", "10"}, ":0\r\n"},
+		{"expire ok", []string{"EXPIRE", "k", "100"}, ":1\r\n"},
+		{"ttl after expire", []string{"TTL", "k"}, ":100\r\n"},
+		{"persist ok", []string{"PERSIST", "k"}, ":1\r\n"},
+		{"ttl after persist", []string{"TTL", "k"}, ":-1\r\n"},
+		{"expire bad seconds", []string{"EXPIRE", "k", "abc"}, "-ERR value is not an integer or out of range\r\n"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Dispatch(s, tt.args); got != tt.want {
+				t.Errorf("Dispatch(%v) = %q, want %q", tt.args, got, tt.want)
+			}
+		})
+	}
+}

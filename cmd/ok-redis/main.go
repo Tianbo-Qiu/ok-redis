@@ -2,10 +2,12 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"io"
 	"log"
 	"net"
+	"time"
 
 	"github.com/Tianbo-Qiu/ok-redis/internal/command"
 	"github.com/Tianbo-Qiu/ok-redis/internal/resp"
@@ -20,6 +22,10 @@ func main() {
 	defer ln.Close()
 
 	st := store.New()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	st.StartExpiryWorker(ctx, time.Second)
 
 	log.Println("ok-redis listening on :6380")
 

@@ -2,6 +2,7 @@ package command
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/Tianbo-Qiu/ok-redis/internal/resp"
 	"github.com/Tianbo-Qiu/ok-redis/internal/store"
@@ -62,6 +63,37 @@ func cmdExists(s *store.Store, args []string) string {
 		exists = 1
 	}
 	return resp.Integer(exists)
+}
+
+func cmdExpire(s *store.Store, args []string) string {
+	seconds, err := strconv.ParseInt(args[2], 10, 64)
+	if err != nil {
+		return resp.Error("ERR value is not an integer or out of range")
+	}
+	if s.Expire(args[1], time.Duration(seconds)*time.Second) {
+		return resp.Integer(1)
+	}
+	return resp.Integer(0)
+}
+
+func cmdTTL(s *store.Store, args []string) string {
+	ttl, exists, hasExpiry := s.TTL(args[1])
+	switch {
+	case !exists:
+		return resp.Integer(-2)
+	case !hasExpiry:
+		return resp.Integer(-1)
+	default:
+		secs := int64(ttl.Round(time.Second) / time.Second)
+		return resp.Integer(secs)
+	}
+}
+
+func cmdPersist(s *store.Store, args []string) string {
+	if s.Persist(args[1]) {
+		return resp.Integer(1)
+	}
+	return resp.Integer(0)
 }
 
 func incrBy(s *store.Store, key string, delta int64) string {

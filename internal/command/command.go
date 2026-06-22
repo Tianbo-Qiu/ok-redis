@@ -18,15 +18,18 @@ type command struct {
 }
 
 var registry = map[string]command{
-	"PING":   {arity: 1, handler: cmdPing},
-	"SET":    {arity: 3, handler: cmdSet},
-	"GET":    {arity: 2, handler: cmdGet},
-	"DEL":    {arity: 2, handler: cmdDel},
-	"INCR":   {arity: 2, handler: cmdIncr},
-	"DECR":   {arity: 2, handler: cmdDecr},
-	"INCRBY": {arity: 3, handler: cmdIncrBy},
-	"DECRBY": {arity: 3, handler: cmdDecrBy},
-	"EXISTS": {arity: 2, handler: cmdExists},
+	"PING":    {arity: 1, handler: cmdPing},
+	"SET":     {arity: 3, handler: cmdSet},
+	"GET":     {arity: 2, handler: cmdGet},
+	"DEL":     {arity: 2, handler: cmdDel},
+	"INCR":    {arity: 2, handler: cmdIncr},
+	"DECR":    {arity: 2, handler: cmdDecr},
+	"INCRBY":  {arity: 3, handler: cmdIncrBy},
+	"DECRBY":  {arity: 3, handler: cmdDecrBy},
+	"EXISTS":  {arity: 2, handler: cmdExists},
+	"EXPIRE":  {arity: 3, handler: cmdExpire},
+	"TTL":     {arity: 2, handler: cmdTTL},
+	"PERSIST": {arity: 2, handler: cmdPersist},
 }
 
 func Dispatch(s *store.Store, args []string) string {

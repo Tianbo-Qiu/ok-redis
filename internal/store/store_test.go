@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestGetSet(t *testing.T) {
@@ -85,5 +86,77 @@ func TestIncrConcurrent(t *testing.T) {
 	want := strconv.Itoa(goroutines * perGoroutine)
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestExpiredKeyIsInvisible(t *testing.T) {
+	s := New()
+
+	s.data["temp"] = entry{value: "x", expireAt: time.Now().Add(-time.Second)}
+
+	if _, ok := s.Get("temp"); ok {
+		t.Errorf("expected expired key to be invisible to Get")
+	}
+}
+
+func TestExpireAndTTL(t *testing.T) {
+	s := New()
+
+	if _, exists, _ := s.TTL("nope"); exists {
+		t.Errorf("expected missing key to report exists=false")
+	}
+
+	s.Set("name", "alice")
+	if _, exists, hasExpiry := s.TTL("name"); !exists || hasExpiry {
+		t.Errorf("got exists=%v want true, hasExpiry=%v want false", exists, hasExpiry)
+	}
+
+	if s.Expire("nope", time.Minute) {
+		t.Errorf("expected Expire on missing key to return false")
+	}
+
+	if !s.Expire("name", 100*time.Second) {
+		t.Fatalf("expected Expire to succeed")
+	}
+
+	ttl, exists, hasExpiry := s.TTL("name")
+	if !exists || !hasExpiry {
+		t.Fatalf("got exists=%v hasExpiry=%v, want both true", exists, hasExpiry)
+	}
+	if ttl <= 99*time.Second || ttl > 100*time.Second {
+		t.Errorf("ttl = %v, want ~100s", ttl)
+	}
+	// Persist removes the expiry
+	if !s.Persist("name") {
+		t.Errorf("expected Persist to remove an expiry")
+	}
+	if _, _, hasExpiry := s.TTL("name"); hasExpiry {
+		t.Errorf("expected no expiry after Persist")
+	}
+}
+
+func TestExpirePastDeletesOnAccess(t *testing.T) {
+	s := New()
+	s.Set("temp", "x")
+	s.Expire("temp", -time.Second) // already in the past
+	if _, ok := s.Get("temp"); ok {
+		t.Errorf("expected key with a past expiry to be gone")
+	}
+}
+
+func TestSweepExpired(t *testing.T) {
+	s := New()
+	s.Set("keep", "1")
+	// plant an already-expired entry directly (same-package test):
+	s.data["gone"] = entry{value: "2", expireAt: time.Now().Add(-time.Second)}
+
+	if removed := s.sweepExpired(); removed != 1 {
+		t.Errorf("removed = %d, want 1", removed)
+	}
+	if _, ok := s.data["gone"]; ok {
+		t.Errorf("expected expired key to be swept")
+	}
+	if _, ok := s.data["keep"]; !ok {
+		t.Errorf("expected live key to survive")
 	}
 }
