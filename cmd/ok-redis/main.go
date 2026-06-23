@@ -7,6 +7,9 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/Tianbo-Qiu/ok-redis/internal/command"
@@ -15,27 +18,34 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	ln, err := net.Listen("tcp", ":6380")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer ln.Close()
 
 	st := store.New()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	st.StartExpiryWorker(ctx, time.Second)
+
+	go func() {
+		<-ctx.Done()
+		log.Println("shutting down...")
+		ln.Close()
+	}()
 
 	log.Println("ok-redis listening on :6380")
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
 			log.Println("accept:", err)
 			continue
 		}
-
 		go handleConn(conn, st)
 	}
 }
